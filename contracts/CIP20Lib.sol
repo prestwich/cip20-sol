@@ -12,9 +12,8 @@ library CIP20Lib {
     uint8 private constant BLAKE2S_SELECTOR = 0x10;
     uint8 private constant BLAKE2XS_SELECTOR = 0x11;
 
-    // default Blake2s config
     bytes32
-        private constant BLAKE2S_CONFIG = 0x2000010100000000000000000000000000000000000000000000000000000000;
+        private constant BLAKE2S_DEFAULT_CONFIG = 0x2000010100000000000000000000000000000000000000000000000000000000;
 
     // Accepts a fully formed input blob. This should include any config
     // options and the preimage, but not the selector.
@@ -69,11 +68,15 @@ library CIP20Lib {
         return executeCip20(input, KECCAK_512_SELECTOR, 64);
     }
 
-    function blake2sWithConfig(bytes32 config, bytes memory preimage)
-        internal
-        view
-        returns (bytes memory)
-    {
+    function blake2sWithConfig(
+        bytes32 config,
+        bytes memory key,
+        bytes memory preimage
+    ) internal view returns (bytes memory) {
+        require(
+            key.length == uint256(config >> (8 * 30)) & 0xff,
+            "CIP20Lib/blake2sWithConfig - Provided key length does not match key length in config"
+        );
         bytes memory configuredInput = abi.encodePacked(config, preimage);
         return
             executeCip20(
@@ -85,40 +88,44 @@ library CIP20Lib {
 
     function blake2XsWithConfig(
         bytes32 config,
+        bytes memory key,
         bytes memory preimage,
-        uint16 outputSize
+        uint16 xofDigestLength
     ) internal view returns (bytes memory) {
+        require(
+            key.length == uint256(config >> (8 * 30)) & 0xff,
+            "CIP20Lib/blake2XsWithConfig - Provided key length does not match key length in config"
+        );
         // Add an extra byte on the front. We'll then write the desired output
         // size to the first 2 bytes.
-        bytes memory configuredInput = abi.encodePacked(
-            config,
-            preimage
-        );
+        bytes memory configuredInput = abi.encodePacked(config, key, preimage);
 
         return
             executeCip20(
                 configuredInput,
                 BLAKE2XS_SELECTOR,
-                uint256(outputSize)
+                uint256(xofDigestLength)
             );
     }
 
-    // default settings
+    // default settings, no key
     function blake2s(bytes memory preimage)
         internal
         view
         returns (bytes memory)
     {
-        return blake2sWithConfig(BLAKE2S_CONFIG, preimage);
+        return blake2sWithConfig(BLAKE2S_DEFAULT_CONFIG, hex"", preimage);
     }
 
-    // default settings
-    function blake2Xs(bytes memory preimage, uint16 outputSize)
+    // default settings, no key, XOF digest 
+    function blake2Xs(bytes memory preimage, uint16 xofDigestLength)
         internal
         view
         returns (bytes memory)
     {
-        return blake2XsWithConfig(BLAKE2S_CONFIG, preimage, outputSize);
+        bytes32 config = BLAKE2S_DEFAULT_CONFIG;
+        config = writeLEU16(config, 12, xofDigestLength);
+        return blake2XsWithConfig(BLAKE2S_DEFAULT_CONFIG, hex"", preimage, xofDigestLength);
     }
 
     function createConfig(
@@ -151,8 +158,8 @@ library CIP20Lib {
         return config;
     }
 
-    // This function relies on alignment mechanics. Explict conversion to 
-    // `bytes` types shorter than 32 results in left re-alignment. To avoid 
+    // This function relies on alignment mechanics. Explict conversion to
+    // `bytes` types shorter than 32 results in left re-alignment. To avoid
     // that, we convert the bytes32 to uint256 instead of converting the uint8
     // to a bytes1.
     function writeU8(
@@ -160,8 +167,9 @@ library CIP20Lib {
         uint8 offset,
         uint8 toWrite
     ) private pure returns (bytes32) {
+        require(offset <= 31, "CIP20Lib/writeU8 -- out of bounds write");
         uint8 shift = 8 * (32 - 1 - offset);
-        return bytes32(uint256(b) | toWrite << shift);
+        return bytes32(uint256(b) | (toWrite << shift));
     }
 
     function writeLEU32(
