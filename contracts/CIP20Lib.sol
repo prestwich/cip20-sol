@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity >=0.5.10;
 
-import {TypedMemView} from "@summa-tx/memview.sol/contracts/TypedMemView.sol";
-
 library CIP20Lib {
     uint8 private constant CIP20_ADDRESS = 0xf3;
 
@@ -93,8 +91,12 @@ library CIP20Lib {
         uint16 xofDigestLength
     ) internal view returns (bytes memory) {
         require(
-            key.length == uint256(config >> (8 * 30)) & 0xff,
+            key.length == uint256(config >> (8 * 30)) & 0xffff,
             "CIP20Lib/blake2XsWithConfig - Provided key length does not match key length in config"
+        );
+        require(
+            uint256(config >> (8 * 31)) == 0x20,
+            "CIP20Lib/blake2XsWithConfig - Digest size must be set to 0x20 for blake2Xs"
         );
         // Add an extra byte on the front. We'll then write the desired output
         // size to the first 2 bytes.
@@ -117,7 +119,7 @@ library CIP20Lib {
         return blake2sWithConfig(BLAKE2S_DEFAULT_CONFIG, hex"", preimage);
     }
 
-    // default settings, no key, XOF digest 
+    // default settings, no key, XOF digest
     function blake2Xs(bytes memory preimage, uint16 xofDigestLength)
         internal
         view
@@ -125,7 +127,13 @@ library CIP20Lib {
     {
         bytes32 config = BLAKE2S_DEFAULT_CONFIG;
         config = writeLEU16(config, 12, xofDigestLength);
-        return blake2XsWithConfig(BLAKE2S_DEFAULT_CONFIG, hex"", preimage, xofDigestLength);
+        return
+            blake2XsWithConfig(
+                BLAKE2S_DEFAULT_CONFIG,
+                hex"",
+                preimage,
+                xofDigestLength
+            );
     }
 
     function createConfig(
@@ -141,6 +149,10 @@ library CIP20Lib {
         bytes8 salt,
         bytes8 personalize
     ) internal pure returns (bytes32 config) {
+        require(
+            keyLength <= 8,
+            "CIP20Lib/createConfig -- keyLength must be 8 or less"
+        );
         config = writeU8(config, 0, digestSize);
         config = writeU8(config, 1, keyLength);
 
