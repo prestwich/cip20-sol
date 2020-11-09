@@ -39,7 +39,7 @@ library CIP20Lib {
             success := staticcall(
                 sub(gas(), 2000),
                 addr,
-                add(input, 0x19), // location is shifted 1 byte for selector
+                add(input, 0x1F), // location is shifted 1 byte for selector
                 add(len, 0x01), // length w/ selector
                 add(output, 0x20), // location
                 mload(output) // length
