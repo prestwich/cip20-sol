@@ -22,7 +22,6 @@ library CIP20Lib {
     ) internal view returns (bytes memory) {
         uint8 addr = CIP20_ADDRESS;
         bytes memory output = new bytes(output_len);
-        bool success;
 
         // To avoid copying the input array (an unbounded cost) we store its
         // length on the stack and then replace the length prefix for its
@@ -30,6 +29,7 @@ library CIP20Lib {
         // length in memory after the precompile executes with it.
         uint256 len = input.length;
 
+        bool success;
         assembly {
             mstore(input, selector) // selector
 
@@ -88,7 +88,7 @@ library CIP20Lib {
         bytes32 config,
         bytes memory key,
         bytes memory preimage,
-        uint16 xofDigestLength
+        uint16 outputBytes
     ) internal view returns (bytes memory) {
         require(
             key.length == uint256(config >> (8 * 30)) & 0xffff,
@@ -100,13 +100,13 @@ library CIP20Lib {
         );
         // Add an extra byte on the front. We'll then write the desired output
         // size to the first 2 bytes.
-        bytes memory configuredInput = abi.encodePacked(config, key, preimage);
+        bytes memory configuredInput = abi.encodePacked(config, key, outputBytes, preimage);
 
         return
             executeCip20(
                 configuredInput,
                 BLAKE2XS_SELECTOR,
-                uint256(xofDigestLength)
+                uint256(outputBytes)
             );
     }
 
@@ -150,8 +150,8 @@ library CIP20Lib {
         bytes8 personalize
     ) internal pure returns (bytes32 config) {
         require(
-            keyLength <= 8,
-            "CIP20Lib/createConfig -- keyLength must be 8 or less"
+            keyLength <= 32,
+            "CIP20Lib/createConfig -- keyLength must be 32 or less"
         );
         config = writeU8(config, 0, digestSize);
         config = writeU8(config, 1, keyLength);
