@@ -7,8 +7,8 @@ library CIP20Lib {
     uint8 private constant SHA3_256_SELECTOR = 0x00;
     uint8 private constant SHA3_512_SELECTOR = 0x01;
     uint8 private constant KECCAK_512_SELECTOR = 0x02;
+    uint8 private constant SHA2_512_SELECTOR = 0x03;
     uint8 private constant BLAKE2S_SELECTOR = 0x10;
-    uint8 private constant BLAKE2XS_SELECTOR = 0x11;
 
     bytes32
         private constant BLAKE2S_DEFAULT_CONFIG = 0x2000010100000000000000000000000000000000000000000000000000000000;
@@ -66,6 +66,10 @@ library CIP20Lib {
         return executeCip20(input, KECCAK_512_SELECTOR, 64);
     }
 
+    function sha2_512(bytes memory input) internal view returns (bytes memory) {
+        return executeCip20(input, SHA2_512_SELECTOR, 64);
+    }
+
     function blake2sWithConfig(
         bytes32 config,
         bytes memory key,
@@ -112,6 +116,9 @@ library CIP20Lib {
         config = writeU8(config, 14, nodeDepth);
         config = writeU8(config, 15, innerLength);
 
+        // bytesX are left aligned. we need to right align.
+        // First we cast to an int of same size (to change the alginment)
+        // Then we cast to bytes32 (via uint256).
         config |= bytes32(uint256(uint64(salt))) << (8 * 8);
         config |= bytes32(uint256(uint64(personalize))) << (8 * 0);
 
@@ -122,6 +129,8 @@ library CIP20Lib {
     // `bytes` types shorter than 32 results in left re-alignment. To avoid
     // that, we convert the bytes32 to uint256 instead of converting the uint8
     // to a bytes1.
+    //
+    // Offset is left-aligned
     function writeU8(
         bytes32 b,
         uint8 offset,
