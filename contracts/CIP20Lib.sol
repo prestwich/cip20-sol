@@ -125,7 +125,7 @@ library CIP20Lib {
         return config;
     }
 
-    // This function relies on alignment mechanics. Explict conversion to
+    // This function relies on alignment mechanics. Explicit conversion to
     // `bytes` types shorter than 32 results in left re-alignment. To avoid
     // that, we convert the bytes32 to uint256 instead of converting the uint8
     // to a bytes1.
@@ -138,7 +138,7 @@ library CIP20Lib {
     ) private pure returns (bytes32) {
         require(offset <= 31, "CIP20Lib/writeU8 -- out of bounds write");
         uint8 shift = 8 * (32 - 1 - offset);
-        return bytes32(uint256(b) | (toWrite << shift));
+        return bytes32(uint256(b) | (uint256(toWrite) << shift));
     }
 
     function writeLEU32(
